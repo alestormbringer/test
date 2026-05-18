@@ -6,29 +6,27 @@ from app.core.logger import setup_logger
 from app.core.engine import TradingEngine
 
 
-def main():
-    setup_logger()
+async def run():
     engine = TradingEngine()
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    loop = asyncio.get_running_loop()
 
-    def shutdown_handler(sig, frame):
-        logger.info(f"Received signal {sig}, shutting down...")
-        loop.run_until_complete(engine.stop())
-        loop.stop()
-        sys.exit(0)
+    def shutdown_handler():
+        logger.info("Shutdown signal received")
+        asyncio.create_task(engine.stop())
 
-    signal.signal(signal.SIGINT, shutdown_handler)
-    signal.signal(signal.SIGTERM, shutdown_handler)
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, shutdown_handler)
 
+    await engine.start()
+
+
+def main():
+    setup_logger()
     try:
-        loop.run_until_complete(engine.start())
+        asyncio.run(run())
     except KeyboardInterrupt:
-        logger.info("KeyboardInterrupt received")
-        loop.run_until_complete(engine.stop())
-    finally:
-        loop.close()
+        logger.info("Bot stopped")
 
 
 if __name__ == "__main__":

@@ -47,9 +47,9 @@ class RiskManager:
             await self._trigger_kill_switch(f"Daily drawdown limit hit: {daily_drawdown_pct:.2%}")
             return False, "Daily drawdown limit hit"
 
-        max_position_size = self.current_capital * settings.risk_per_trade
-        if position_size_usd > max_position_size * 2:
-            return False, f"Position size too large: {position_size_usd:.2f} > {max_position_size*2:.2f}"
+        max_position_size = self.current_capital * 0.15  # matches calculate_position_size cap
+        if position_size_usd > max_position_size:
+            return False, f"Position size too large: {position_size_usd:.2f} > {max_position_size:.2f}"
 
         max_exposure = self.current_capital * 0.5
         if self.total_exposure + position_size_usd > max_exposure:

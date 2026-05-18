@@ -1,0 +1,61 @@
+trading:
+  mode: paper
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - SOLUSDT
+  timeframes:
+    - 1m
+    - 5m
+
+risk:
+  risk_per_trade: 0.005
+  daily_drawdown_limit: 0.03
+  max_open_positions: 5
+  take_profit_pct: 0.004
+  stop_loss_pct: 0.0025
+  max_exposure_pct: 0.50
+  trailing_stop: true
+
+paper_trading:
+  initial_capital: 50.0
+  maker_fee: 0.001
+  taker_fee: 0.001
+  slippage_bps: 3
+  simulate_latency: true
+  latency_ms_min: 50
+  latency_ms_max: 200
+
+strategies:
+  trend_following:
+    enabled: true
+    timeframe: 5m
+    ema_fast: 20
+    ema_slow: 50
+  mean_reversion:
+    enabled: true
+    timeframe: 5m
+    bb_period: 20
+    bb_std: 2.0
+  breakout:
+    enabled: true
+    timeframe: 5m
+    lookback: 20
+  momentum_scalping:
+    enabled: true
+    timeframe: 1m
+  volatility_scalping:
+    enabled: true
+    timeframe: 1m
+
+reporting:
+  daily_report_time: "23:59"
+  formats:
+    - json
+    - csv
+  retain_days: 30
+
+dashboard:
+  host: "0.0.0.0"
+  port: 8080
+  realtime_update_interval: 2

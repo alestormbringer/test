@@ -88,5 +88,6 @@ class RegimeDetector:
             avg_gain[i] = (avg_gain[i - 1] * (period - 1) + gains[i - 1]) / period
             avg_loss[i] = (avg_loss[i - 1] * (period - 1) + losses[i - 1]) / period
 
-        rs = np.where(avg_loss > 0, avg_gain / avg_loss, 100)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            rs = np.where(avg_loss > 0, avg_gain / avg_loss, 100)
         return 100 - (100 / (1 + rs))

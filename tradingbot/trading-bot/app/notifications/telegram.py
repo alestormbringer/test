@@ -29,7 +29,8 @@ class TelegramNotifier:
             payload = {"chat_id": self.chat_id, "text": text, "parse_mode": "HTML"}
             async with self._session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
-                    logger.warning(f"Telegram send failed: {resp.status}")
+                    body = await resp.text()
+                    logger.warning(f"Telegram send failed: {resp.status} — {body}")
         except Exception as e:
             logger.error(f"Telegram error: {e}")
 
@@ -53,7 +54,7 @@ class TelegramNotifier:
             f"Entry:  ${entry:.4f}\n"
             f"Exit:   ${exit_price:.4f}\n"
             f"PnL:    {pnl_pct:+.2f}%\n"
-            f"P&amp;L $: {pnl:+.2f} USDT\n"
+            f"PnL $:  {pnl:+.2f} USDT\n"
             f"Reason: {reason}\n"
             f"Regime: {regime}"
         )

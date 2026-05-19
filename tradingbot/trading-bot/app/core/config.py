@@ -37,8 +37,11 @@ class Settings(BaseSettings):
     take_profit_pct: float = 0.004
     stop_loss_pct: float = 0.0025
 
+    # Max daily losses before pausing
+    max_daily_losses: int = 5
+
     # Assets
-    monitored_symbols: str = "BTCUSDT,ETHUSDT,SOLUSDT"
+    monitored_symbols: str = "SOLUSDT,XRPUSDT,ADAUSDT,DOGEUSDT,BNBUSDT"
 
     # Dashboard
     dashboard_host: str = "0.0.0.0"

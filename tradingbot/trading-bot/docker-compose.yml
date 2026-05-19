@@ -1,8 +1,8 @@
 services:
   trading-bot:
     build:
-      context: ..
-      dockerfile: trading-bot/docker/Dockerfile
+      context: .
+      dockerfile: docker/Dockerfile
     container_name: trading_bot
     restart: unless-stopped
     env_file: .env

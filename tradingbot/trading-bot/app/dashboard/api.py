@@ -22,7 +22,10 @@ def set_trading_engine(engine):
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
-    return HTMLResponse(content=_build_html())
+    return HTMLResponse(
+        content=_build_html(),
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"}
+    )
 
 
 @app.get("/api/summary")

@@ -7,7 +7,7 @@ from app.core.events import event_bus, Event, EventType
 BULLISH = "BULLISH"
 BEARISH = "BEARISH"
 REGIME_SYMBOL = "BTCUSDT"
-REGIME_TIMEFRAME = "15m"
+REGIME_TIMEFRAME = "5m"
 
 
 class RegimeDetector:

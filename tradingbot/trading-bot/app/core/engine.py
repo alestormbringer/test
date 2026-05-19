@@ -56,7 +56,8 @@ class TradingEngine:
         await self.notifier.start()
         set_trading_engine(self)
 
-        await self.data_feed.start(settings.symbols_list, ["1m", "5m"])
+        all_symbols = list(set(settings.symbols_list + ["BTCUSDT"]))
+        await self.data_feed.start(all_symbols, ["1m", "5m"])
         self.data_feed.on_ticker(self._on_ticker_update)
         self.data_feed.on_candle(self._on_candle_update)
 

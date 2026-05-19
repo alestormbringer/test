@@ -7,7 +7,7 @@ from app.core.events import event_bus, Event, EventType
 BULLISH = "BULLISH"
 BEARISH = "BEARISH"
 REGIME_SYMBOL = "BTCUSDT"
-REGIME_TIMEFRAME = "5m"
+REGIME_TIMEFRAME = "15m"
 
 
 class RegimeDetector:
@@ -55,6 +55,7 @@ class RegimeDetector:
         bullish_ema = ema20[-1] > ema50[-1]
         bullish_rsi = rsi[-1] > 50
 
+        logger.info(f"Regime check — EMA20={ema20[-1]:.4f} EMA50={ema50[-1]:.4f} RSI={rsi[-1]:.1f} bullish_ema={bullish_ema} bullish_rsi={bullish_rsi}")
         if bullish_ema and bullish_rsi:
             return BULLISH
         elif not bullish_ema and not bullish_rsi:

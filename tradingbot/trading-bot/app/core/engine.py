@@ -154,7 +154,7 @@ class TradingEngine:
                 signal.entry_price, signal.stop_loss
             )
 
-            if position_size_usd < 1.0:
+            if position_size_usd < 0.10:
                 logger.debug(f"Position size too small for {signal.symbol}: ${position_size_usd:.2f}")
                 return
 

@@ -1,11 +1,12 @@
 import asyncio
-from datetime import datetime, time
+from datetime import datetime, date
 from typing import Dict, List, Optional
 from loguru import logger
 from app.core.config import settings
 from app.core.events import event_bus, Event, EventType
 from app.market.data_feed import BinanceDataFeed
 from app.market.scanner import MarketScanner
+from app.market.regime_detector import RegimeDetector, BULLISH, BEARISH
 from app.strategies.selector import StrategySelector
 from app.risk.manager import RiskManager
 from app.paper_trading.engine import PaperTradingEngine
@@ -20,6 +21,7 @@ class TradingEngine:
     def __init__(self):
         self.data_feed = BinanceDataFeed()
         self.market_scanner = MarketScanner(self.data_feed)
+        self.regime_detector = RegimeDetector(self.data_feed)
         self.strategy_selector = StrategySelector()
         self.risk_manager = RiskManager()
         self.paper_engine = PaperTradingEngine()
@@ -30,7 +32,10 @@ class TradingEngine:
 
         self._running = False
         self._last_signal_time: Dict[str, datetime] = {}
-        self._min_signal_interval_seconds = 60  # throttle per symbol
+        self._min_signal_interval_seconds = 60
+
+        self._daily_losses = 0
+        self._last_loss_reset: Optional[date] = None
 
     async def start(self):
         logger.info("=" * 60)
@@ -42,33 +47,31 @@ class TradingEngine:
 
         self._running = True
 
-        # Register event handlers
         event_bus.subscribe(EventType.POSITION_OPENED, self._on_position_opened)
         event_bus.subscribe(EventType.POSITION_CLOSED, self._on_position_closed)
         event_bus.subscribe(EventType.KILL_SWITCH_TRIGGERED, self._on_kill_switch)
+        event_bus.subscribe(EventType.REGIME_CHANGED, self._on_regime_changed)
 
-        # Initialize components
         await self.risk_manager.initialize(settings.initial_capital)
         await self.notifier.start()
         set_trading_engine(self)
 
-        # Start data feed
         await self.data_feed.start(settings.symbols_list, ["1m", "5m"])
         self.data_feed.on_ticker(self._on_ticker_update)
         self.data_feed.on_candle(self._on_candle_update)
 
-        # Wait for initial data
         logger.info("Waiting for initial market data (30s)...")
         await asyncio.sleep(30)
 
-        # Run all components concurrently
         await asyncio.gather(
             event_bus.run(),
             self.market_scanner.start(),
+            self.regime_detector.start(),
             self._trading_loop(),
             self._position_monitor_loop(),
             self._analytics_update_loop(),
             self._daily_report_loop(),
+            self._status_loop(),
             self._run_dashboard(),
         )
 
@@ -76,6 +79,7 @@ class TradingEngine:
         logger.info("Stopping trading engine...")
         self._running = False
         self.market_scanner.stop()
+        self.regime_detector.stop()
         event_bus.stop()
         await self.data_feed.stop()
         await self.notifier.stop()
@@ -92,10 +96,29 @@ class TradingEngine:
         server = uvicorn.Server(config)
         await server.serve()
 
+    def _check_daily_loss_reset(self):
+        today = date.today()
+        if self._last_loss_reset != today:
+            self._daily_losses = 0
+            self._last_loss_reset = today
+
+    @property
+    def _max_daily_losses_hit(self) -> bool:
+        self._check_daily_loss_reset()
+        return self._daily_losses >= settings.max_daily_losses
+
     async def _trading_loop(self):
         while self._running:
             try:
                 if self.risk_manager.kill_switch_active:
+                    await asyncio.sleep(10)
+                    continue
+
+                if self.regime_detector.current_regime == BEARISH:
+                    await asyncio.sleep(10)
+                    continue
+
+                if self._max_daily_losses_hit:
                     await asyncio.sleep(10)
                     continue
 
@@ -115,14 +138,12 @@ class TradingEngine:
 
     async def _process_symbol(self, symbol: str):
         try:
-            # Throttle signals per symbol
             last_time = self._last_signal_time.get(symbol)
             if last_time:
                 elapsed = (datetime.utcnow() - last_time).total_seconds()
                 if elapsed < self._min_signal_interval_seconds:
                     return
 
-            # Don't trade if already have position in this symbol
             existing_positions = [
                 p for p in self.paper_engine.positions.values()
                 if p.symbol == symbol
@@ -154,7 +175,7 @@ class TradingEngine:
                 signal.entry_price, signal.stop_loss
             )
 
-            if position_size_usd < 1.0:
+            if position_size_usd < 0.10:
                 logger.debug(f"Position size too small for {signal.symbol}: ${position_size_usd:.2f}")
                 return
 
@@ -168,11 +189,24 @@ class TradingEngine:
                 self.risk_manager.register_trade_open(position_size_usd)
                 await self.notifier.notify_trade_opened(
                     signal.symbol, signal.direction, signal.entry_price,
-                    position_size_usd, signal.strategy
+                    position_size_usd, signal.strategy,
+                    regime=self.regime_detector.current_regime,
                 )
 
         except Exception as e:
             logger.error(f"Error executing signal for {signal.symbol}: {e}")
+
+    async def _close_all_positions(self, reason: str):
+        current_prices = {
+            sym: ticker.last
+            for sym, ticker in self.data_feed.tickers.items()
+            if ticker
+        }
+        for pos_id in list(self.paper_engine.positions.keys()):
+            pos = self.paper_engine.positions.get(pos_id)
+            if pos:
+                price = current_prices.get(pos.symbol, pos.entry_price)
+                await self.paper_engine.close_position(pos_id, price, reason)
 
     async def _position_monitor_loop(self):
         while self._running:
@@ -202,7 +236,6 @@ class TradingEngine:
         while self._running:
             try:
                 now = datetime.utcnow()
-                # Run report at 23:59 UTC
                 if now.hour == 23 and now.minute == 59:
                     report = await self.reporter.generate_daily_report()
                     await self.notifier.notify_daily_report(report)
@@ -213,6 +246,22 @@ class TradingEngine:
                 logger.error(f"Daily report error: {e}")
                 await asyncio.sleep(60)
 
+    async def _status_loop(self):
+        """Send regime + daily losses status to Telegram every 20 minutes."""
+        await asyncio.sleep(120)  # wait 2 min after startup before first status
+        while self._running:
+            try:
+                self._check_daily_loss_reset()
+                await self.notifier.notify_status(
+                    self.regime_detector.current_regime,
+                    self._daily_losses,
+                    settings.max_daily_losses,
+                )
+                await asyncio.sleep(1200)  # 20 minutes
+            except Exception as e:
+                logger.error(f"Status loop error: {e}")
+                await asyncio.sleep(60)
+
     async def _on_ticker_update(self, ticker):
         self.paper_engine.update_price(ticker.symbol, ticker.last)
 
@@ -221,33 +270,51 @@ class TradingEngine:
 
     async def _on_position_opened(self, event: Event):
         data = event.data
-        logger.info(f"Position opened event: {data['symbol']} {data['direction']} @ {data['entry_price']}")
+        logger.info(f"Position opened: {data['symbol']} {data['direction']} @ {data['entry_price']}")
 
     async def _on_position_closed(self, event: Event):
         data = event.data
         pnl = data.get("pnl", 0)
-        # Update risk manager
-        # Find position size from closed positions
+
         closed = [p for p in self.paper_engine.closed_positions if p.id == data.get("id")]
         size_usd = closed[-1].size_usd if closed else 0.0
         self.risk_manager.register_trade_close(size_usd, pnl)
-        # Update strategy performance
+
         if closed:
             self.strategy_selector.update_performance(closed[-1].strategy, pnl)
-        await self.notifier.notify_trade_closed(data["symbol"], pnl, data.get("reason", ""))
+
+        if pnl < 0:
+            self._check_daily_loss_reset()
+            self._daily_losses += 1
+            if self._max_daily_losses_hit:
+                logger.warning(f"Daily loss limit reached: {self._daily_losses}/{settings.max_daily_losses}")
+
+        entry = data.get("entry_price", 0)
+        exit_price = data.get("exit_price", 0)
+        pnl_pct = ((exit_price - entry) / entry * 100) if entry > 0 else 0
+        direction = closed[-1].direction if closed else "long"
+
+        await self.notifier.notify_trade_closed(
+            data["symbol"], direction, entry, exit_price,
+            pnl, pnl_pct, data.get("reason", ""),
+            regime=self.regime_detector.current_regime,
+        )
+
+    async def _on_regime_changed(self, event: Event):
+        regime = event.data.get("regime", BEARISH)
+        self._check_daily_loss_reset()
+        logger.info(f"Regime event received: {regime}")
+
+        await self.notifier.notify_regime_change(
+            regime, self._daily_losses, settings.max_daily_losses
+        )
+
+        if regime == BEARISH:
+            logger.info("Regime BEARISH — closing all positions")
+            await self._close_all_positions("regime_change_exit")
 
     async def _on_kill_switch(self, event: Event):
         reason = event.data.get("reason", "Unknown")
         logger.critical(f"Kill switch event received: {reason}")
         await self.notifier.notify_kill_switch(reason)
-        # Close all positions
-        current_prices = {
-            sym: ticker.last
-            for sym, ticker in self.data_feed.tickers.items()
-            if ticker
-        }
-        for pos_id in list(self.paper_engine.positions.keys()):
-            pos = self.paper_engine.positions.get(pos_id)
-            if pos:
-                price = current_prices.get(pos.symbol, pos.entry_price)
-                await self.paper_engine.close_position(pos_id, price, "kill_switch")
+        await self._close_all_positions("kill_switch")

@@ -19,6 +19,7 @@ class EventType(Enum):
     ERROR = "error"
     TICKER_UPDATE = "ticker_update"
     CANDLE_UPDATE = "candle_update"
+    REGIME_CHANGED = "regime_changed"
 
 
 @dataclass

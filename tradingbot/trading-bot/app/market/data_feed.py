@@ -32,14 +32,16 @@ class BinanceDataFeed:
         self._running = True
         self._session = aiohttp.ClientSession()
 
-        # Load historical candles first
-        for symbol in symbols:
-            for tf in timeframes:
+        # Always include BTCUSDT 15m for regime detection
+        all_symbols = list(dict.fromkeys(["BTCUSDT"] + symbols))
+        all_timeframes = list(dict.fromkeys(timeframes + ["15m"]))
+
+        for symbol in all_symbols:
+            for tf in all_timeframes:
                 await self._load_historical_candles(symbol, tf)
 
-        # Start WebSocket streams
         self._ws_task = asyncio.create_task(
-            self._run_websocket(symbols, timeframes)
+            self._run_websocket(all_symbols, all_timeframes)
         )
         logger.info(f"BinanceDataFeed started for {symbols}")
 

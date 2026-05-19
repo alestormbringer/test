@@ -1,6 +1,5 @@
 import numpy as np
 from typing import Optional, List
-from datetime import datetime
 from app.strategies.base import BaseStrategy
 from app.market.models import MarketSignal, Candle, Ticker
 from app.core.config import settings

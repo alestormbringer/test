@@ -1,9 +1,14 @@
-from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
-import os
+
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
+
     # Trading mode
     trading_mode: str = "paper"
 
@@ -13,10 +18,10 @@ class Settings(BaseSettings):
     binance_testnet: bool = False
 
     # Database
-    database_url: str = "postgresql+asyncpg://trader:trading123@localhost:5432/tradingbot"
+    database_url: str = "postgresql+asyncpg://trader:trading123@postgres:5432/tradingbot"
 
     # Redis
-    redis_url: str = "redis://localhost:6379"
+    redis_url: str = "redis://redis:6379"
 
     # Telegram
     telegram_bot_token: str = ""
@@ -50,9 +55,5 @@ class Settings(BaseSettings):
     def is_paper_trading(self) -> bool:
         return self.trading_mode.lower() == "paper"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
 
 settings = Settings()

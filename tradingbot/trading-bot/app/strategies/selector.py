@@ -8,6 +8,7 @@ from app.strategies.mean_reversion import MeanReversionStrategy
 from app.strategies.breakout import BreakoutStrategy
 from app.strategies.momentum_scalping import MomentumScalpingStrategy
 from app.strategies.volatility_scalping import VolatilityScalpingStrategy
+from app.strategies.trend_continuation import TrendContinuationStrategy
 from app.market.models import MarketSignal, Candle, Ticker
 
 
@@ -26,6 +27,7 @@ class StrategySelector:
             BreakoutStrategy(),
             MomentumScalpingStrategy(),
             VolatilityScalpingStrategy(),
+            TrendContinuationStrategy(),
         ]
         self.strategy_performance: Dict[str, Dict] = {
             s.name: {"wins": 0, "losses": 0, "total_pnl": 0.0} for s in self.strategies
@@ -72,7 +74,7 @@ class StrategySelector:
         candles_1m = candles_by_tf.get("1m", [])
 
         if global_regime == "BEARISH":
-            active_strategies = [s for s in self.strategies if s.name in ["trend_following", "momentum_scalping", "breakout", "volatility_scalping"]]
+            active_strategies = [s for s in self.strategies if s.name in ["trend_following", "momentum_scalping", "breakout", "volatility_scalping", "trend_continuation"]]
         elif global_regime == "BULLISH":
             regime = self._detect_regime(candles_5m if candles_5m else candles_1m)
             active_strategies = self._get_strategies_for_regime(regime)

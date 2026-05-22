@@ -32,7 +32,7 @@ class TradingEngine:
 
         self._running = False
         self._last_signal_time: Dict[str, datetime] = {}
-        self._min_signal_interval_seconds = 60
+        self._min_signal_interval_seconds = 10
 
         self._daily_losses = 0
         self._last_loss_reset: Optional[date] = None
@@ -140,13 +140,6 @@ class TradingEngine:
                 if elapsed < self._min_signal_interval_seconds:
                     return
 
-            existing_positions = [
-                p for p in self.paper_engine.positions.values()
-                if p.symbol == symbol
-            ]
-            if existing_positions:
-                return
-
             candles_by_tf = {
                 "1m": self.data_feed.get_candles(symbol, "1m"),
                 "5m": self.data_feed.get_candles(symbol, "5m"),
@@ -168,10 +161,11 @@ class TradingEngine:
     async def _execute_signal(self, signal):
         try:
             regime = self.regime_detector.current_regime
-            if regime == BEARISH and signal.direction == "long":
+            is_micro_scalp = signal.strategy == "micro_scalp"
+            if regime == BEARISH and signal.direction == "long" and not is_micro_scalp:
                 logger.debug(f"Skipping long signal for {signal.symbol} — regime BEARISH")
                 return
-            if regime == BULLISH and signal.direction == "short":
+            if regime == BULLISH and signal.direction == "short" and not is_micro_scalp:
                 logger.debug(f"Skipping short signal for {signal.symbol} — regime BULLISH")
                 return
 

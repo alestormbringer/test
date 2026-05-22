@@ -156,7 +156,7 @@ class TradingEngine:
             if not any(candles_by_tf.values()):
                 return
 
-            signals = await self.strategy_selector.get_signals(symbol, candles_by_tf, ticker)
+            signals = await self.strategy_selector.get_signals(symbol, candles_by_tf, ticker, self.regime_detector.current_regime)
 
             for signal in signals:
                 await self._execute_signal(signal)

@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # Risk
     risk_per_trade: float = 0.005
     daily_drawdown_limit: float = 0.03
-    max_open_positions: int = 5
+    max_open_positions: int = 10
     take_profit_pct: float = 0.004
     stop_loss_pct: float = 0.0025
 

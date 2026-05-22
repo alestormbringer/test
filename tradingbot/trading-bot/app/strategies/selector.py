@@ -67,12 +67,18 @@ class StrategySelector:
         names = regime_strategies.get(regime, [s.name for s in self.strategies])
         return [s for s in self.strategies if s.name in names]
 
-    async def get_signals(self, symbol: str, candles_by_tf: Dict[str, List[Candle]], ticker: Optional[Ticker]) -> List[MarketSignal]:
+    async def get_signals(self, symbol: str, candles_by_tf: Dict[str, List[Candle]], ticker: Optional[Ticker], global_regime: Optional[str] = None) -> List[MarketSignal]:
         candles_5m = candles_by_tf.get("5m", [])
         candles_1m = candles_by_tf.get("1m", [])
 
-        regime = self._detect_regime(candles_5m if candles_5m else candles_1m)
-        active_strategies = self._get_strategies_for_regime(regime)
+        if global_regime == "BEARISH":
+            active_strategies = [s for s in self.strategies if s.name in ["trend_following", "momentum_scalping", "breakout", "volatility_scalping"]]
+        elif global_regime == "BULLISH":
+            regime = self._detect_regime(candles_5m if candles_5m else candles_1m)
+            active_strategies = self._get_strategies_for_regime(regime)
+        else:
+            regime = self._detect_regime(candles_5m if candles_5m else candles_1m)
+            active_strategies = self._get_strategies_for_regime(regime)
 
         signals = []
         for strategy in active_strategies:

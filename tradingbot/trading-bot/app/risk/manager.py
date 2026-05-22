@@ -47,7 +47,7 @@ class RiskManager:
             await self._trigger_kill_switch(f"Daily drawdown limit hit: {daily_drawdown_pct:.2%}")
             return False, "Daily drawdown limit hit"
 
-        max_exposure = self.current_capital * 0.5
+        max_exposure = self.current_capital * 0.8
         if self.total_exposure + position_size_usd > max_exposure:
             return False, f"Max total exposure would be exceeded"
 
@@ -71,7 +71,7 @@ class RiskManager:
         if price_risk == 0:
             return 0.0
         position_size_usd = risk_amount / price_risk
-        max_allowed = self.current_capital * 0.15
+        max_allowed = self.current_capital * 0.05
         return min(position_size_usd, max_allowed)
 
     async def report_api_error(self):

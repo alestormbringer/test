@@ -52,15 +52,13 @@ class RegimeDetector:
         ema50 = self._ema(closes, 50)
         rsi = self._rsi(closes, 14)
 
-        bullish_ema = ema20[-1] > ema50[-1]
-        bullish_rsi = rsi[-1] > 50
+        bullish_signals = sum([
+            ema20[-1] > ema50[-1],
+            rsi[-1] > 50,
+            closes[-1] > ema50[-1],
+        ])
 
-        if bullish_ema and bullish_rsi:
-            return BULLISH
-        elif not bullish_ema and not bullish_rsi:
-            return BEARISH
-        # Mixed signals — keep current regime to avoid flip-flopping
-        return self.current_regime
+        return BULLISH if bullish_signals >= 2 else BEARISH
 
     def _ema(self, closes: np.ndarray, period: int) -> np.ndarray:
         ema = np.zeros_like(closes)

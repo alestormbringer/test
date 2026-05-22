@@ -114,10 +114,6 @@ class TradingEngine:
                     await asyncio.sleep(10)
                     continue
 
-                if self.regime_detector.current_regime == BEARISH:
-                    await asyncio.sleep(10)
-                    continue
-
                 if self._max_daily_losses_hit:
                     await asyncio.sleep(10)
                     continue
@@ -171,6 +167,14 @@ class TradingEngine:
 
     async def _execute_signal(self, signal):
         try:
+            regime = self.regime_detector.current_regime
+            if regime == BEARISH and signal.direction == "long":
+                logger.debug(f"Skipping long signal for {signal.symbol} — regime BEARISH")
+                return
+            if regime == BULLISH and signal.direction == "short":
+                logger.debug(f"Skipping short signal for {signal.symbol} — regime BULLISH")
+                return
+
             position_size_usd = self.risk_manager.calculate_position_size(
                 signal.entry_price, signal.stop_loss
             )
@@ -205,6 +209,18 @@ class TradingEngine:
         for pos_id in list(self.paper_engine.positions.keys()):
             pos = self.paper_engine.positions.get(pos_id)
             if pos:
+                price = current_prices.get(pos.symbol, pos.entry_price)
+                await self.paper_engine.close_position(pos_id, price, reason)
+
+    async def _close_positions_by_direction(self, direction: str, reason: str):
+        current_prices = {
+            sym: ticker.last
+            for sym, ticker in self.data_feed.tickers.items()
+            if ticker
+        }
+        for pos_id in list(self.paper_engine.positions.keys()):
+            pos = self.paper_engine.positions.get(pos_id)
+            if pos and pos.direction == direction:
                 price = current_prices.get(pos.symbol, pos.entry_price)
                 await self.paper_engine.close_position(pos_id, price, reason)
 
@@ -310,8 +326,11 @@ class TradingEngine:
         )
 
         if regime == BEARISH:
-            logger.info("Regime BEARISH — closing all positions")
-            await self._close_all_positions("regime_change_exit")
+            logger.info("Regime BEARISH — closing long positions")
+            await self._close_positions_by_direction("long", "regime_change_exit")
+        elif regime == BULLISH:
+            logger.info("Regime BULLISH — closing short positions")
+            await self._close_positions_by_direction("short", "regime_change_exit")
 
     async def _on_kill_switch(self, event: Event):
         reason = event.data.get("reason", "Unknown")

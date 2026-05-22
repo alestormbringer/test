@@ -172,6 +172,8 @@ class TradingEngine:
             position_size_usd = self.risk_manager.calculate_position_size(
                 signal.entry_price, signal.stop_loss
             )
+            perf_multiplier = self.strategy_selector.get_performance_multiplier(signal.strategy)
+            position_size_usd *= perf_multiplier
 
             if position_size_usd < 0.10:
                 logger.debug(f"Position size too small for {signal.symbol}: ${position_size_usd:.2f}")

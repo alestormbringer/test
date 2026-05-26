@@ -3,6 +3,7 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from loguru import logger
 from app.paper_trading.engine import PaperPosition
+from app.core.config import settings
 
 
 class AnalyticsEngine:
@@ -46,21 +47,20 @@ class AnalyticsEngine:
         else:
             sharpe = 0
 
-        # Max drawdown from equity curve
+        # Max drawdown from equity curve (anchored to initial capital)
         equity_curve = []
-        running = 0
+        running = settings.initial_capital
         for p in sorted(positions, key=lambda x: x.closed_at or datetime.utcnow()):
             running += p.pnl
             equity_curve.append(running)
 
         max_drawdown = 0.0
-        peak = equity_curve[0] if equity_curve else 0
+        peak = equity_curve[0] if equity_curve else settings.initial_capital
         for val in equity_curve:
             if val > peak:
                 peak = val
-            if peak > 0:
-                dd = (peak - val) / (peak + 1e-8)
-                max_drawdown = max(max_drawdown, dd)
+            dd = (peak - val) / peak
+            max_drawdown = max(max_drawdown, dd)
 
         # Duration
         durations = []

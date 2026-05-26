@@ -140,6 +140,10 @@ class TradingEngine:
                 if elapsed < self._min_signal_interval_seconds:
                     return
 
+            symbol_open = sum(1 for p in self.paper_engine.positions.values() if p.symbol == symbol)
+            if symbol_open >= 2:
+                return
+
             candles_by_tf = {
                 "1m": self.data_feed.get_candles(symbol, "1m"),
                 "5m": self.data_feed.get_candles(symbol, "5m"),
@@ -303,8 +307,11 @@ class TradingEngine:
 
         entry = data.get("entry_price", 0)
         exit_price = data.get("exit_price", 0)
-        pnl_pct = ((exit_price - entry) / entry * 100) if entry > 0 else 0
         direction = closed[-1].direction if closed else "long"
+        if entry > 0:
+            pnl_pct = ((exit_price - entry) / entry * 100) if direction == "long" else ((entry - exit_price) / entry * 100)
+        else:
+            pnl_pct = 0
 
         await self.notifier.notify_trade_closed(
             data["symbol"], direction, entry, exit_price,

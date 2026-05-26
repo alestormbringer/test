@@ -14,7 +14,7 @@ from app.strategies.micro_scalp import MicroScalpStrategy
 from app.market.models import MarketSignal, Candle, Ticker
 
 PERF_FILE = "data/strategy_performance.json"
-MIN_TRADES_FOR_ADAPTATION = 5
+MIN_TRADES_FOR_ADAPTATION = 15
 
 
 class MarketRegime:
@@ -81,11 +81,11 @@ class StrategySelector:
             return 1.0
         win_rate = wins / total
         if win_rate >= 0.60:
-            return 1.3
+            return 1.2
         elif win_rate >= 0.40:
             return 1.0
         else:
-            return 0.7
+            return 0.85
 
     def _detect_regime(self, candles: List[Candle]) -> str:
         if len(candles) < 30:

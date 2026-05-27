@@ -82,7 +82,7 @@ class TelegramNotifier:
             f"Trades: {perf.get('total_trades', 0)}\n"
             f"Win Rate: {perf.get('win_rate', 0):.1%}\n"
             f"Daily PnL: {perf.get('total_pnl', 0):+.4f} USDT\n"
-            f"Equity: {portfolio.get('equity', 0):.2f} USDT\n"
+            f"Balance: {portfolio.get('current_balance', 0):.2f} USDT\n"
             f"Max DD: {perf.get('max_drawdown', 0):.2%}"
         )
         await self.send_message(msg)

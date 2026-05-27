@@ -38,7 +38,8 @@ class EventBus:
     def subscribe(self, event_type: EventType, handler: Callable):
         if event_type not in self._subscribers:
             self._subscribers[event_type] = []
-        self._subscribers[event_type].append(handler)
+        if handler not in self._subscribers[event_type]:
+            self._subscribers[event_type].append(handler)
 
     async def publish(self, event: Event):
         try:

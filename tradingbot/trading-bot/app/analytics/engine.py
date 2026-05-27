@@ -55,7 +55,7 @@ class AnalyticsEngine:
             equity_curve.append(running)
 
         max_drawdown = 0.0
-        peak = equity_curve[0] if equity_curve else settings.initial_capital
+        peak = settings.initial_capital
         for val in equity_curve:
             if val > peak:
                 peak = val
@@ -132,7 +132,11 @@ class AnalyticsEngine:
         }
 
     def get_daily_metrics(self) -> Dict:
-        daily_positions = self._get_recent(days=1)
+        today = datetime.utcnow().date()
+        daily_positions = [
+            p for p in self._closed_positions
+            if p.closed_at and p.closed_at.date() == today
+        ]
         return self.compute_metrics(daily_positions)
 
     def get_all_metrics(self) -> Dict:

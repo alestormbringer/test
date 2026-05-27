@@ -156,6 +156,9 @@ class TradingEngine:
             signals = await self.strategy_selector.get_signals(symbol, candles_by_tf, ticker, self.regime_detector.current_regime)
 
             for signal in signals:
+                symbol_open = sum(1 for p in self.paper_engine.positions.values() if p.symbol == symbol)
+                if symbol_open >= 2:
+                    break
                 await self._execute_signal(signal)
                 self._last_signal_time[symbol] = datetime.utcnow()
 
@@ -164,6 +167,9 @@ class TradingEngine:
 
     async def _execute_signal(self, signal):
         try:
+            if self._max_daily_losses_hit:
+                return
+
             regime = self.regime_detector.current_regime
             is_micro_scalp = signal.strategy == "micro_scalp"
             if regime == BEARISH and signal.direction == "long" and not is_micro_scalp:
